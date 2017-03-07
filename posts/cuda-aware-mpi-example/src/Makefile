@@ -79,6 +79,9 @@ cuda_normal_mpi.o: Jacobi.h CUDA_Normal_MPI.c Makefile
 thrust_sandbox.o: Jacobi.h thrust_sandbox.cu Makefile
 	$(NVCC) $(CUDACFLAGS) $(NVCCFLAGS) --expt-extended-lambda --std=c++11 -c thrust_sandbox.cu -o $@
 
+thrust_naive_jacobi: thrust_naive_jacobi.cu
+	$(NVCC) $^ $(CUDACFLAGS) $(NVCCFLAGS) --expt-extended-lambda --std=c++11 -o $@
+
 cuda_aware_mpi.o: Jacobi.h CUDA_Aware_MPI.c Makefile
 	$(MPICC) $(MPICFLAGS) $(CFLAGS) $(CUDACFLAGS) -c CUDA_Aware_MPI.c -o cuda_aware_mpi.o
 
