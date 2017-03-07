@@ -65,7 +65,7 @@
  * set the CUDA device for the MPI process before MPI environment initialization. If you are using MVAPICH2, 
  * set this constant to "MV2_COMM_WORLD_LOCAL_RANK"; for Open MPI, use "OMPI_COMM_WORLD_LOCAL_RANK".  
  */
-#define ENV_LOCAL_RANK		"MV2_COMM_WORLD_LOCAL_RANK"
+#define ENV_LOCAL_RANK		"OMPI_COMM_WORLD_LOCAL_RANK"
 
 /**
  * This is the global rank of the root (master) process; in this application, it is mostly relevant for
