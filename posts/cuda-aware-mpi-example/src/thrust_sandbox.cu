@@ -2,8 +2,14 @@
 #define THRUST_SANDBOX_H
 
 #include "Jacobi.h"
+
+#include "thrust/transform_reduce.h"
+#include "thrust/inner_product.h"
+
+#include "thrust/functional.h"
+
 #include "thrust/device_vector.h"
-#include <thrust/device_ptr.h>
+#include "thrust/device_ptr.h"
 
 namespace detail {
 
@@ -85,7 +91,7 @@ struct jacobi_functor
     int2 shape;
     int4 bounds;
     thrust::device_ptr<T> newBlock,oldBlock;
-    T* global_residue   ;
+    // T* global_residue   ;
 
     __host__ __device__
     void operator()(std::size_t linear_idx)
@@ -103,39 +109,43 @@ struct jacobi_functor
 
             newBlock[memIdx] = newVal;
 
-            detail::AtomicMax<T>(global_residue, detail::rabs(newVal - oldBlock[memIdx]));
+            // detail::AtomicMax<T>(global_residue, detail::rabs(newVal - oldBlock[memIdx]));
         };
 };
 
+template <typename T>
+struct abs_diff : public thrust::binary_function<T,T,T>
+{
+    __host__ __device__
+    T operator()(const T& a, const T& b)
+    {
+        return detail::rabs(b - a);
+    }
+};
 
 extern "C" real CallJacobiKernel(real * devBlocks[2], real * devResidue, const int4 * bounds, const int2 * size)
 {
-    real residue = 0.;
 
-    thrust::device_vector<real> d_res(1,0.);
     const std::size_t len = size->x * size->y;
-
-    thrust::device_vector<real> d_old(thrust::device_pointer_cast(devBlocks[0]),
-                                      thrust::device_pointer_cast(devBlocks[0])+len);
-    thrust::device_vector<real> d_new(thrust::device_pointer_cast(devBlocks[1]),
-                                      thrust::device_pointer_cast(devBlocks[1])+len);
 
     thrust::counting_iterator<std::size_t> begin{0};
     thrust::counting_iterator<std::size_t> end{len};
     auto kernel = jacobi_functor<real>{*size,*bounds,
                                        thrust::device_pointer_cast(devBlocks[1]),
-                                       thrust::device_pointer_cast(devBlocks[0]),
-                                       thrust::raw_pointer_cast(d_res.data())};
+                                       thrust::device_pointer_cast(devBlocks[0])// ,
+                                       // thrust::raw_pointer_cast(d_res.data())
+    };
 
-    // jacobi_functor{len,rep/8.0f + constant,
-    //         d_input.data(),
-    //         d_source.data(),
-    //         raw_pointer_cast(d_result.data())}
 
-    for_each(begin,end,
-             kernel);
+    thrust::for_each(begin,end,
+                     kernel);
 
-    thrust::copy(d_res.begin(),d_res.end(),&residue);
+    thrust::maximum<real> binary_op1;
+    abs_diff<real>        binary_op2;
+
+    thrust::device_vector<real> oldBlock(devBlocks[1], devBlocks[1]+len);
+    thrust::device_vector<real> newBlock(devBlocks[0], devBlocks[0]+len);
+    real residue = thrust::inner_product(oldBlock.begin(), oldBlock.end(), newBlock.begin(), real(0.), binary_op1, binary_op2);
     return residue;
 }
 
